@@ -24,6 +24,7 @@
       <div class="topbar-nav">
         <nav class="nav-links" aria-label="Navegação do painel">
           <a href="/panel/" class="active">Scraping</a>
+          <a href="/panel/leads">Leads</a>
           <a href="/panel/engagement">Engajamento</a>
           <a href="/panel/whatsapp">WhatsApp</a>
           <a href="/panel/email">Email</a>
@@ -152,54 +153,6 @@
               </tr>
             </thead>
             <tbody id="executionsBody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h3>Leads</h3>
-          <div class="row-gap">
-            <select id="leadsSourceFilter"></select>
-            <select id="leadsGenderFilter">
-              <option value="">Todos os generos</option>
-              <option value="F">Feminino</option>
-              <option value="M">Masculino</option>
-            </select>
-            <label>
-              Por pagina
-              <select id="leadsPageSize">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="30">30</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </label>
-            <button id="prevLeads" type="button" class="ghost">Anterior</button>
-            <span id="leadsPageLabel" class="page-label">Página 1</span>
-            <button id="nextLeads" type="button" class="ghost">Próxima</button>
-            <button id="refreshLeads" type="button" class="ghost">Atualizar</button>
-          </div>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nome</th>
-                <th>Email</th>
-                <th>Telefone</th>
-                <th>Score</th>
-                <th>Temp.</th>
-                <th>Funil</th>
-                <th>Genero</th>
-                <th>Fonte</th>
-                <th>Criado em</th>
-              </tr>
-            </thead>
-            <tbody id="leadsBody"></tbody>
           </table>
         </div>
       </section>

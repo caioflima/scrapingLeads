@@ -223,7 +223,8 @@ async function listLeads({
   sourceId = null,
   gender = null,
   temperature = null,
-  funnelStage = null
+  funnelStage = null,
+  fieldArea = null
 }) {
   const query = db("leads")
     .select(
@@ -241,7 +242,13 @@ async function listLeads({
       "next_action",
       "contacted",
       "email_unsubscribed",
-      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.gender')) as gender")
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.gender')) as gender"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.website')) as website"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.address')) as address"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.segmento')) as segmento"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.instagram')) as instagram"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.facebook')) as facebook"),
+      db.raw("JSON_UNQUOTE(JSON_EXTRACT(raw_data, '$.enriched_at')) as enriched_at")
     )
     .orderBy("engagement_score", "desc")
     .orderBy("id", "desc")
@@ -250,6 +257,10 @@ async function listLeads({
 
   if (sourceId) {
     query.where({ source_id: sourceId });
+  } else if (fieldArea) {
+    query.whereIn("source_id", function () {
+      this.select("id").from("lead_sources").where("field_area", fieldArea);
+    });
   }
 
   if (gender) {
@@ -443,7 +454,7 @@ async function updateLeadEmailEnrichment(leadId, { email, emailNormalized, enric
   return { updated: true, leadId };
 }
 
-async function listUncontactedLeadsWithPhone(limit = 100) {
+async function listUncontactedLeadsWithPhone({ limit = 100, offset = 0 } = {}) {
   return db("leads")
     .select(
       "id",
@@ -465,7 +476,8 @@ async function listUncontactedLeadsWithPhone(limit = 100) {
     .where("phone_normalized", "!=", "")
     .orderBy("engagement_score", "desc")
     .orderBy("id", "desc")
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 async function markLeadAsContacted(id) {
@@ -478,6 +490,15 @@ async function markLeadAsContacted(id) {
     });
   await recalculateLeadEngagement(id);
   return true;
+}
+
+async function countLeadsByFieldArea() {
+  return db("leads")
+    .join("lead_sources", "leads.source_id", "lead_sources.id")
+    .select("lead_sources.field_area")
+    .count("leads.id as total")
+    .groupBy("lead_sources.field_area")
+    .orderBy("total", "desc");
 }
 
 module.exports = {
@@ -500,5 +521,6 @@ module.exports = {
   countUncontactedLeadsWithPhone,
   updateLeadEmailEnrichment,
   listUncontactedLeadsWithPhone,
-  markLeadAsContacted
+  markLeadAsContacted,
+  countLeadsByFieldArea
 };

@@ -279,6 +279,7 @@ router.post("/run", async (req, res, next) => {
     }
 
     const sourceIdRaw = req.body?.sourceId;
+    const fieldArea = req.body?.fieldArea;
     let sourceId = null;
 
     if (sourceIdRaw !== undefined && sourceIdRaw !== null && sourceIdRaw !== "") {
@@ -288,7 +289,7 @@ router.post("/run", async (req, res, next) => {
       }
     }
 
-    const launch = await startScraping({ sourceId });
+    const launch = await startScraping({ sourceId, fieldArea });
     if (launch.alreadyRunning) {
       return res.status(409).json({
         message: "Ja existe um scraping em andamento. Aguarde a conclusao ou atualize a tabela de execucoes.",

@@ -164,11 +164,15 @@ async function processSource(source) {
   }
 }
 
-async function runScraping({ sourceId } = {}) {
+async function runScraping({ sourceId, fieldArea } = {}) {
   const sources = await getActiveSources();
-  const selectedSources = sourceId
-    ? sources.filter((source) => source.id === Number(sourceId))
-    : sources;
+  let selectedSources = sources;
+
+  if (sourceId) {
+    selectedSources = selectedSources.filter((source) => source.id === Number(sourceId));
+  } else if (fieldArea) {
+    selectedSources = selectedSources.filter((source) => source.field_area === fieldArea);
+  }
 
   if (selectedSources.length === 0) {
     logger.warn({ sourceId }, "No sources to process");

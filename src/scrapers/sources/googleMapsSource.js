@@ -163,12 +163,21 @@ async function scrapeGoogleMaps(source, config, logger, hooks = {}) {
           }
 
           const anchors = Array.from(document.querySelectorAll("a"));
+          let instagram = null;
+          let facebook = null;
+          let linkedin = null;
+          
           for (const anchor of anchors) {
             const href = anchor.href || "";
             if (href.startsWith("mailto:")) {
               mapsEmails.push(href.replace(/^mailto:/i, "").split("?")[0]);
-            }
-            if (href.startsWith("http") && !href.includes("google.com") && !website) {
+            } else if (href.includes("instagram.com/")) {
+              if (!instagram) instagram = href;
+            } else if (href.includes("facebook.com/")) {
+              if (!facebook) facebook = href;
+            } else if (href.includes("linkedin.com/")) {
+              if (!linkedin) linkedin = href;
+            } else if (href.startsWith("http") && !href.includes("google.com") && !website) {
               website = href;
             }
           }
@@ -180,7 +189,7 @@ async function scrapeGoogleMaps(source, config, logger, hooks = {}) {
             mapsEmails.push(...bodyEmails);
           }
 
-          return { name, phone, website, mapsEmails };
+          return { name, phone, website, mapsEmails, instagram, facebook, linkedin };
         });
 
         await detailPage.close();
@@ -195,15 +204,22 @@ async function scrapeGoogleMaps(source, config, logger, hooks = {}) {
             name: data.name
           }));
 
+        const validPhone = safePhone(data.phone);
+        const hasContact = validPhone || data.instagram || data.facebook || data.linkedin || email;
+
         const finalEmail = email || (() => {
-          const phoneStr = safePhone(data.phone) || "";
-          const phoneKey = phoneStr.replace(/\D/g, "") || Math.floor(Math.random() * 1000000).toString();
-          return `sem-email-${phoneKey}@mapscraper.local`;
+          let key = Math.floor(Math.random() * 1000000).toString();
+          if (validPhone) {
+            key = validPhone.replace(/\D/g, "");
+          } else if (data.instagram) {
+            key = data.instagram.split("/").filter(Boolean).pop() || key;
+          } else if (data.facebook) {
+            key = data.facebook.split("/").filter(Boolean).pop() || key;
+          }
+          return `sem-email-${key.replace(/[^a-zA-Z0-9]/g, "")}@mapscraper.local`;
         })();
 
-        const validPhone = safePhone(data.phone);
-
-        if (data.name && data.name !== "Nome Não Encontrado" && validPhone) {
+        if (data.name && data.name !== "Nome Não Encontrado" && hasContact) {
           leads.push({
             name: data.name,
             email: finalEmail.toLowerCase(),
@@ -212,13 +228,16 @@ async function scrapeGoogleMaps(source, config, logger, hooks = {}) {
               source: "Google Maps",
               website: data.website,
               maps_url: link,
+              instagram: data.instagram,
+              facebook: data.facebook,
+              linkedin: data.linkedin,
               scraped_phone: data.phone,
               email_from_maps: !!mapsEmail,
               email_from_website: !!email && !mapsEmail
             }
           });
         } else {
-          logger.debug({ name: data.name, phone: validPhone }, "Lead descartado por falta de dados validos");
+          logger.debug({ name: data.name, hasContact }, "Lead descartado por falta de contato (telefone, email ou rede social)");
         }
 
         if (onProgress) {

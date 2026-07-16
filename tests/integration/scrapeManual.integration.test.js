@@ -7,23 +7,27 @@ jest.mock("../../src/database/knex", () => {
   const chain = {
     select: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    first: jest.fn()
+    first: jest.fn(),
+    insert: jest.fn().mockResolvedValue([1]),
+    update: jest.fn().mockResolvedValue(1)
   };
 
   const db = jest.fn(() => chain);
   db.transaction = jest.fn(async (handler) => handler(jest.fn()));
   db.__chain = chain;
+  db.fn = { now: jest.fn() };
 
   return db;
 });
 
 jest.mock("../../src/repositories/leadRepository", () => ({
   findLeadByEmailAndSource: jest.fn(),
+  findLeadByFullIdentity: jest.fn(),
   insertLead: jest.fn()
 }));
 
 const db = require("../../src/database/knex");
-const { findLeadByEmailAndSource, insertLead } = require("../../src/repositories/leadRepository");
+const { findLeadByEmailAndSource, findLeadByFullIdentity, insertLead } = require("../../src/repositories/leadRepository");
 const app = require("../../src/app");
 
 describe("POST /api/scrape/manual", () => {
@@ -45,7 +49,8 @@ describe("POST /api/scrape/manual", () => {
         fields: ["nome", "email"],
         consent: true,
         page: 2,
-        pageSize: 10
+        pageSize: 10,
+        fetchAll: false
       });
 
     expect(response.status).toBe(200);
@@ -60,7 +65,7 @@ describe("POST /api/scrape/manual", () => {
       data: "<html><body><h1>Lead Teste</h1>ana@dominio.com (11) 98888-0000 bia@dominio.com</body></html>"
     });
 
-    findLeadByEmailAndSource.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 99 });
+    findLeadByFullIdentity.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 99 });
     insertLead.mockResolvedValue({ id: 10 });
 
     const response = await request(app)

@@ -156,6 +156,7 @@
       <div class="topbar-nav">
         <nav class="nav-links" aria-label="Navegação do painel">
           <a href="/panel/">Scraping</a>
+          <a href="/panel/leads">Leads</a>
           <a href="/panel/engagement">Engajamento</a>
           <a href="/panel/whatsapp">WhatsApp</a>
           <a href="/panel/email">Email</a>
@@ -182,6 +183,10 @@
           <p class="metric" id="statMorno" style="color:#8a6d10">-</p>
         </article>
         <article class="card">
+          <h2>Frios (educar)</h2>
+          <p class="metric" id="statFrio" style="color:#a93c3c">-</p>
+        </article>
+        <article class="card">
           <h2>Com WhatsApp/e-mail</h2>
           <p class="metric" id="statContact">-</p>
           <p class="card-sub">Prontos para abordagem direta</p>
@@ -189,232 +194,50 @@
       </section>
 
       <section class="panel">
-        <p class="pros-intro">
-          Mapa de prospecção do eixo <strong>Av. Morumbi (Brooklin / Santo Amaro)</strong> a partir de fotos de fachada.
-          Situação digital e contatos verificados por busca web (jul/2026). O <strong>score</strong> estima a
-          probabilidade do negócio querer/pagar por LP, site institucional, automação ou sistema interno —
-          maior para independentes sem site que vivem de agenda/captação.
-        </p>
+        <ul class="pros-intro" style="list-style: none; padding-left: 0;">
+          <li><strong>Score e Temperatura de Prospecção:</strong></li>
+          <li>🔥 <strong>Quente (Score &gt;= 60):</strong> Leads que possuem redes sociais ativas (como Instagram ou Facebook) mas <strong>não</strong> têm site próprio. Alta oportunidade de conversão para venda de Landing Pages e Sites. Também engloba leads que já vêm com contatos muito enriquecidos.</li>
+          <li>🟡 <strong>Morno (Score entre 40 e 59):</strong> Leads que já possuem um site e redes sociais. A oportunidade aqui é oferecer automação de atendimento, otimização de SEO e sistemas internos.</li>
+          <li>🧊 <strong>Frio (Score &lt; 40):</strong> Leads com pouca ou nenhuma presença digital e informações limitadas. Precisam de um trabalho inicial de conscientização sobre a importância de estarem no Google.</li>
+        </ul>
 
-        <div class="pros-filters">
+        <div class="pros-filters" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+          <input type="text" id="prosSearchInput" placeholder="Buscar por nome, segmento..." style="padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-2); color: var(--ink); font-size: 0.85rem; width: 100%; max-width: 250px;" />
           <button type="button" class="pros-tab active" data-filter="todos">Todos</button>
           <button type="button" class="pros-tab" data-filter="quente">Quentes</button>
           <button type="button" class="pros-tab" data-filter="morno">Mornos</button>
           <button type="button" class="pros-tab" data-filter="frio">Frios</button>
           <button type="button" class="pros-tab" data-filter="comContato">Só com contato</button>
+          <button type="button" class="pros-tab" id="refreshProsBtn" style="border-color: var(--accent); color: var(--accent); margin-right: 0.5rem;">Atualizar Lista</button>
+          <select id="prosPageSize" style="padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-2); color: var(--ink); font-size: 0.85rem; outline: none; cursor: pointer;">
+            <option value="10">10 por pág.</option>
+            <option value="20" selected>20 por pág.</option>
+            <option value="50">50 por pág.</option>
+            <option value="100">100 por pág.</option>
+          </select>
           <span class="pros-count" id="prosCount"></span>
         </div>
 
         <div class="lead-grid" id="leadGrid"></div>
+
+        <div id="prosPagination" style="display: flex; gap: 1rem; align-items: center; justify-content: center; margin-top: 1.5rem;">
+          <button type="button" id="prosPrevPage" class="pros-tab" style="padding: 0.4rem 0.8rem;">Anterior</button>
+          <span id="prosPageLabel" style="font-size: 0.85rem; color: var(--muted); font-weight: 500;">Página 1</span>
+          <button type="button" id="prosNextPage" class="pros-tab" style="padding: 0.4rem 0.8rem;">Próxima</button>
+        </div>
       </section>
     </main>
 
     <script>
-      // Dados coletados das fotos + verificação web (jul/2026).
-      // Telefones fixos (3xxx/5xxx) entram como "tel"; celulares (9xxxx) viram link WhatsApp.
-      const LEADS = [
-        {
-          nome: "Studio Mix Cabelo & Estética", segmento: "Salão de beleza", tier: "quente", score: 90,
-          abordagem: "Oi! Vi que o Studio Mix abriu recentemente aqui na região, parabéns pela casa nova. Reparei que o agendamento hoje é todo pelo WhatsApp. Eu monto uma página com agenda online (o cliente marca sozinho, 24h) que reduz o vai e vem de mensagem e diminui as faltas. Posso te enviar um exemplo de como ficaria a do salão?",
-          endereco: "nº 309 — Av. Morumbi", site: null,
-          situacao: "Só Instagram/WhatsApp — sem site próprio",
-          oportunidade: "LP + agendamento online + Google Meu Negócio",
-          motivo: "Independente, recém-inaugurado, vive de agenda cheia. Lacuna digital = venda fácil.",
-          whatsapp: "5511975008064", tel: null, email: null,
-          demo: "/panel/demos/studio-mix", demo2: "/panel/demos/studio-mix-2",
-          admin: "/panel/demos/studio-mix-admin"
+      let LEADS = [];
+      // Demos manuais por nome — anexados após o fetch da API.
+      const DEMO_BY_NAME = {
+        "Studio Mix Cabelo & Estética": {
+          demo: "/panel/demos/studio-mix",
+          demo2: "/panel/demos/studio-mix-2",
+          admin: "/panel/demos/studio-mix-admin",
         },
-        {
-          nome: "Clínica Família Atípica", segmento: "Clínica de neurodesenvolvimento", tier: "quente", score: 92,
-          abordagem: "Olá! Passei pela Clínica Família Atípica aqui na região. Em clínicas de neurodesenvolvimento a agenda é o coração da operação — sessões recorrentes, várias especialidades e muitas faltas se não tiver lembrete. Eu monto uma página com agendamento online e um painel pra organizar horários, terapeutas e pacientes. Posso te enviar um exemplo de como ficaria pra clínica?",
-          endereco: "Av. Morumbi (fachada próxima)", site: "https://familiaatipica.com.br/",
-          situacao: "Tem Instagram + WhatsApp na fachada; site existe, mas agendamento parece manual",
-          oportunidade: "Sistema de agenda + LP de captação + lembretes WhatsApp",
-          motivo: "Dependência alta de agenda (Autismo/TDAH/atrasos), ticket alto, contato fácil. Melhor lead novo da leva.",
-          whatsapp: "5511911106668", tel: "1135398835", email: null
-        },
-        {
-          nome: "Podologia Especializada / Sano Ser", segmento: "Podologia + Spa", tier: "quente", score: 88,
-          abordagem: "Olá! Passei pela clínica de podologia no Morumbi. Como o atendimento de vocês é por hora marcada, uma página com agendamento e lembrete automático costuma encher a agenda e reduzir faltas. Queria te mostrar um modelo pensado pra podologia e spa, posso enviar?",
-          endereco: "nº 314 — Av. Morumbi", site: null,
-          situacao: "Só telefone/WhatsApp — sem site",
-          oportunidade: "LP + agendamento + captação de recorrência",
-          motivo: "Serviço por hora marcada e recorrente; dois negócios no mesmo ponto (podologia + spa).",
-          whatsapp: "5511966941449", tel: "1150936164", email: null
-        },
-        {
-          nome: "Escola de Boxe Brooklin (StudioDan)", segmento: "Academia / boxe / cross", tier: "quente", score: 85,
-          abordagem: "Fala, Daniel! Acompanhei a Escola de Boxe Brooklin. Pra quem vive de trazer aluno novo e manter mensalista, uma página de captação com aula experimental, além de um controle de matrícula e cobrança, faz diferença direta no caixa. Posso te mostrar como seria pra escola?",
-          endereco: "Av. Morumbi, 8512", site: null,
-          situacao: "Só Instagram + listagens de diretório",
-          oportunidade: "LP de captação + CRM de alunos e cobrança de mensalidade",
-          motivo: "Vive de captar e reter aluno. Automação de matrícula/cobrança tem ROI direto.",
-          whatsapp: "5511971523076", tel: null, email: null
-        },
-        {
-          nome: "ISA — Instituto de Saúde", segmento: "Estúdio fitness / saúde", tier: "quente", score: 82,
-          abordagem: "Oi! Conheci o ISA aqui no Morumbi. Uma página com agendamento de avaliação ajuda a transformar quem passa na frente em cliente e organiza os planos. Posso te mandar um exemplo pensado pro instituto?",
-          endereco: "nº 271 — Fitness · Saúde · Bem-estar", site: null,
-          situacao: "Sem site próprio identificado",
-          oportunidade: "LP + agendamento/gestão de planos e avaliações",
-          motivo: "Estúdio boutique, público que paga. Precisa converter passante em avaliação.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "FHK", segmento: "Restaurante / bar", tier: "quente", score: 80,
-          abordagem: "Olá! Passo sempre pelo FHK e vi o movimento forte de delivery. Hoje boa parte da comissão fica com o aplicativo. Um cardápio digital próprio, com pedido direto e sem taxa de marketplace, costuma se pagar rápido. Posso te mostrar como funcionaria?",
-          endereco: "nº 256 — Av. Morumbi", site: null,
-          situacao: "Nenhuma presença web encontrada",
-          oportunidade: "Site + cardápio digital + reservas/delivery próprio",
-          motivo: "Delivery visível (motoboys). Canal próprio reduz comissão de marketplace.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Invisalign Doctor (clínica odonto)", segmento: "Odontologia", tier: "quente", score: 80,
-          abordagem: "Olá! Vi a clínica aqui no Morumbi. Em odontologia cada paciente novo vale muito, e uma página focada em captação com agendamento e follow-up automático dos interessados aumenta bastante a conversão de orçamentos. Posso te mostrar um modelo pra clínica?",
-          endereco: "Av. Morumbi (Brooklin)", site: null,
-          situacao: "Usa a marca Invisalign — sem site próprio da clínica",
-          oportunidade: "LP + agendamento + automação de follow-up de leads",
-          motivo: "Ticket altíssimo; cada lead vale muito. Investe em captação e nutrição.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Horizonte Decorações", segmento: "Cortinas e persianas", tier: "quente", score: 78,
-          abordagem: "Olá! Passei pela Horizonte Decorações na Av. Morumbi. Em cortinas e persianas o cliente precisa de visita, medição e instalação — e muita gente acaba marcando tudo por telefone. Uma página com agendamento de visita técnica e orçamento online organiza a rotina e traz mais pedidos da região. Posso te mostrar um modelo?",
-          endereco: "Av. Morumbi (nº próximo a 8609) — tel na fachada 5049-1684", site: null,
-          situacao: "Fachada tradicional; telefone fixo na placa — sem evidência de agenda online",
-          oportunidade: "LP + agendamento de visita/medição + formulário de orçamento",
-          motivo: "Negócio local independente, fluxos de agendamento claros (showroom + visita + instalação), fácil de demonstrar valor.",
-          whatsapp: null, tel: "1150491684", email: null
-        },
-        {
-          nome: "IBMM / Castrol Moto Service", segmento: "Oficina + escola de motos", tier: "morno", score: 70,
-          abordagem: "Olá! Passei pelo IBMM / Castrol Moto Service na Av. Morumbi. Vocês já têm presença digital, mas o agendamento da oficina (e a inscrição nos cursos) ainda parece depender de WhatsApp. Uma página com agenda online + captação de alunos costuma reduzir o vai e vem e aumentar conversão. Posso te mostrar um exemplo?",
-          endereco: "Av. Morumbi, 8667", site: "https://www.ibmecmoto.com.br/",
-          situacao: "Tem site e WhatsApp; agendamento convida a falar no WhatsApp",
-          oportunidade: "Agenda online da oficina + LP de cursos/captação",
-          motivo: "Negócio com volume real (oficina + escola). Site existe, mas a oportunidade é modernizar o fluxo de agendamento.",
-          whatsapp: "5511940692147", tel: "1141149790", email: "contato@ibmecmoto.com.br"
-        },
-        {
-          nome: "Jaber", segmento: "Padaria / lanchonete", tier: "morno", score: 65,
-          abordagem: "Oi! Passei pela Jaber. Uma página de pedidos própria e o perfil no Google ajudam a aparecer pra quem busca padaria perto de mim e a vender direto. Posso te mandar um exemplo simples pra começar?",
-          endereco: "Av. Morumbi (Brooklin)", site: null,
-          situacao: "Sem site",
-          oportunidade: "Cardápio/delivery próprio + Google Meu Negócio",
-          motivo: "Sem presença digital, mas ticket baixo e margem apertada.",
-          whatsapp: null, tel: "1150415844", email: null
-        },
-        {
-          nome: "Escola infantil (fachada amarela)", segmento: "Educação infantil", tier: "morno", score: 62,
-          abordagem: "Olá! Vi a escola aqui no Morumbi. Pra educação infantil, um site com informações, fotos e um formulário de matrícula/visita passa mais confiança pros pais e gera contato. Posso te mostrar um modelo?",
-          endereco: "Av. Morumbi (a confirmar)", site: null,
-          situacao: "Provável ausência de site (a confirmar)",
-          oportunidade: "Site institucional + portal de matrículas",
-          motivo: "Escola pequena tende a pagar por credibilidade e matrícula online.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Nova Morumbi", segmento: "Materiais elétricos/hidráulicos", tier: "morno", score: 60,
-          abordagem: "Oi! Passei pela Nova Morumbi. Além de um catálogo online, dá pra montar um sistema simples de orçamento e controle de estoque que agiliza o balcão e evita erro. Posso te mostrar como ficaria?",
-          endereco: "Av. Morumbi (Brooklin)", site: null,
-          situacao: "Sem site",
-          oportunidade: "Catálogo online + sistema interno de orçamento/estoque",
-          motivo: "Melhor candidato a sistema interno do que a LP; venda mais técnica.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "FITHICAR", segmento: "Auto elétrica e mecânica", tier: "morno", score: 55,
-          abordagem: "Olá! Vi que a FITHICAR já tem site, mas ele está um pouco antigo. Dá pra deixar mais moderno e com agendamento de serviço (revisão, troca de óleo) direto pelo celular. Posso te enviar uma proposta de atualização?",
-          endereco: "Av. Morumbi, 8439", site: "http://www.fithicar.com.br",
-          situacao: "Site básico/antigo",
-          oportunidade: "Refação do site + agendamento de serviço",
-          motivo: "Já valoriza ter site, mas está defasado. Venda de 'upgrade'.",
-          whatsapp: null, tel: "1155421262", email: null
-        },
-        {
-          nome: "Piston Garage", segmento: "Funilaria, pintura e mecânica", tier: "morno", score: 58,
-          abordagem: "Olá! Passei pela Piston Garage na Av. Morumbi. Vi que vocês já têm site — dá pra evoluir com agendamento online de serviços (mecânica, polimento, pintura) e orçamento pelo celular, pra reduzir o vai e vem no WhatsApp. Posso te mostrar uma ideia rápida?",
-          endereco: "Av. Morumbi, 8677", site: "https://pistongarage.com.br/",
-          situacao: "Já tem site próprio + WhatsApp na fachada",
-          oportunidade: "Atualização do site + agendamento de serviços + orçamento online",
-          motivo: "Contato fácil (WhatsApp na fachada) e negócio local ativo. Prioridade menor porque já tem site — venda mais por melhoria de fluxo.",
-          whatsapp: "5511950219477", tel: null, email: null
-        },
-        {
-          nome: "TommyGun Barbearia", segmento: "Barbearia (rede local)", tier: "morno", score: 45,
-          abordagem: "Fala! A TommyGun já está bem estruturada com site e agendamento. O próximo passo que costuma reter cliente é um programa de fidelidade com histórico e lembrete de retorno. Posso te mostrar como encaixaria na operação?",
-          endereco: "Av. Morumbi, 8495", site: "https://tommygun.com.br",
-          situacao: "Site próprio + agendamento via Booksy",
-          oportunidade: "App/CRM de fidelidade (upsell)",
-          motivo: "Já resolveu site e agendamento. Só produto avançado agrega.",
-          whatsapp: null, tel: null, email: "contato@tommygun.com.br"
-        },
-        {
-          nome: "Escolinha das Acácias", segmento: "Educação infantil (1969)", tier: "frio", score: 30,
-          abordagem: "Olá! O site de vocês está bem bacana. Uma evolução que os pais gostam é um portal de comunicação e matrícula online. Se fizer sentido, posso mostrar um exemplo.",
-          endereco: "R. Pássaros e Flores, 161/199 — Brooklin", site: "https://www.escolinhadasacacias.com.br",
-          situacao: "Site próprio (Wix)",
-          oportunidade: "Upsell: portal de matrícula/comunicação com pais",
-          motivo: "Já tem site funcional. Só evolução de sistema interno teria valor.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Tear Pijamas", segmento: "Varejo (pijamas)", tier: "frio", score: 20,
-          abordagem: "Oi! A loja online de vocês já está madura. Posso ajudar com otimização de conversão e automações (carrinho abandonado, pós-venda) pra aumentar a receita da mesma base de clientes. Quer que eu mande algumas ideias?",
-          endereco: "Av. Morumbi, 8518 — Brooklin", site: "https://tearpijamas.com.br",
-          situacao: "E-commerce próprio (Nuvemshop)",
-          oportunidade: "Baixa — só otimização de conversão/automação",
-          motivo: "Loja online madura. Demanda pontual e de nicho.",
-          whatsapp: "5511996608950", tel: null, email: "tearpijamas@tearpijamas.com.br"
-        },
-        {
-          nome: "Barbearia Black Zone", segmento: "Barbearia (franquia)", tier: "frio", score: 15,
-          abordagem: "Oi! Como a Black Zone é rede, o site é da franqueadora, mas se esta unidade tiver autonomia dá pra criar uma página local de captação por bairro e campanhas próprias. Faz sentido conversar?",
-          endereco: "Av. Morumbi (Vila Progredior)", site: "https://www.barbeariablackzone.com",
-          situacao: "Site e agendamento da rede",
-          oportunidade: "Nenhuma — digital gerido pela franqueadora",
-          motivo: "Franquia: decisão de digital é centralizada.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Dryclean USA", segmento: "Lavanderia (franquia)", tier: "frio", score: 15,
-          abordagem: "Oi! Sei que a Dryclean é franquia com site da rede. Se a unidade tiver margem pra ações locais, dá pra montar captação por bairro e um canal de pedidos/coleta próprio. Quer ver um exemplo?",
-          endereco: "Av. Morumbi (Brooklin)", site: null,
-          situacao: "Site institucional da rede",
-          oportunidade: "Nenhuma — gerido pela franqueadora",
-          motivo: "Franquia internacional com digital padronizado.",
-          whatsapp: "5511988210299", tel: null, email: null
-        },
-        {
-          nome: "Yadea", segmento: "Loja de scooters elétricas (marca)", tier: "frio", score: 12,
-          abordagem: "Oi! A Yadea tem site nacional, mas a loja pode ganhar com uma página local de captação e agendamento de test-ride da região. Faz sentido conversar?",
-          endereco: "nº 4820 — Av. Morumbi", site: null,
-          situacao: "Site da marca (nacional/global)",
-          oportunidade: "Nenhuma — marca já digitalizada",
-          motivo: "Marca grande; presença web resolvida corporativamente.",
-          whatsapp: null, tel: null, email: null
-        },
-        {
-          nome: "Inst. Beatíssima Virgem Maria", segmento: "Colégio (creche→médio)", tier: "frio", score: 20,
-          abordagem: "Olá! Sei que a escola já tem estrutura própria. Se em algum momento precisarem de apoio pontual em site, matrícula online ou automação, fico à disposição.",
-          endereco: "Av. Morumbi, 8652 — Santo Amaro", site: null,
-          situacao: "Presença institucional consolidada",
-          oportunidade: "Baixa — estrutura própria de TI/marketing",
-          motivo: "Instituição grande, provável fornecedor já contratado.",
-          whatsapp: null, tel: "1155428700", email: "secretaria@iebvm.g12.br"
-        },
-        {
-          nome: "Europcar (unidade Av. Morumbi)", segmento: "Aluguel de carros (franquia)", tier: "frio", score: 10,
-          abordagem: "Oi! Vi a unidade Europcar aqui na Av. Morumbi. Como a operação costuma seguir o sistema da franqueadora, normalmente não cabe site/agenda local. Se a unidade tiver alguma autonomia pra captação da região, posso ajudar pontualmente — mas não é o melhor fit agora.",
-          endereco: "Av. Morumbi, 8653", site: "https://www.europcar.com.br/",
-          situacao: "Franquia multinacional com site e reserva corporativa",
-          oportunidade: "Baixa — sistema já centralizado",
-          motivo: "Rede global com booking próprio. Decisão não está na unidade. Evitar gastar tempo.",
-          whatsapp: null, tel: null, email: null
-        }
-      ];
-
+      };
       const TIER_LABEL = { quente: "Quente", morno: "Morno", frio: "Frio" };
 
       function escapeHtml(str) {
@@ -432,8 +255,8 @@
       }
 
       function scoreClass(score) {
-        if (score >= 78) return "";
-        if (score >= 50) return "mid";
+        if (score >= 70) return "";
+        if (score >= 45) return "mid";
         return "low";
       }
 
@@ -445,8 +268,6 @@
         const parts = [];
         if (lead.whatsapp) {
           const msg = encodeURIComponent(lead.abordagem || `Olá! Falo com a ${lead.nome}?`);
-          // web.whatsapp.com abre o WhatsApp Web na aba do navegador, em vez de tentar
-          // abrir o app nativo (wa.me/api.whatsapp.com pedem um app instalado no desktop).
           parts.push(`<a class="wa" target="_blank" rel="noopener" href="https://web.whatsapp.com/send?phone=${lead.whatsapp}&text=${msg}">WhatsApp ${escapeHtml(fmtPhone(lead.whatsapp))}</a>`);
         }
         if (lead.tel) {
@@ -467,6 +288,12 @@
         if (lead.admin) {
           parts.push(`<a class="mail" target="_blank" rel="noopener" href="${escapeHtml(lead.admin)}">Painel admin</a>`);
         }
+        if (lead.instagram) {
+          parts.push(`<a target="_blank" rel="noopener" href="${escapeHtml(lead.instagram)}">Instagram</a>`);
+        }
+        if (lead.facebook) {
+          parts.push(`<a target="_blank" rel="noopener" href="${escapeHtml(lead.facebook)}">Facebook</a>`);
+        }
         if (!parts.length) {
           parts.push('<span class="no-contact">Sem contato coletado — pesquisar antes de abordar</span>');
         }
@@ -474,9 +301,14 @@
       }
 
       function siteFlag(lead) {
-        if (lead.site) return '<span class="flag ok">tem site</span>';
-        if (/antigo|básico/i.test(lead.situacao)) return '<span class="flag warn">site antigo</span>';
-        return '<span class="flag">sem site</span>';
+        let flags = [];
+        if (lead.site) flags.push('<span class="flag ok">tem site</span>');
+        else flags.push('<span class="flag">sem site</span>');
+        
+        if (lead.enriched_at) flags.push('<span class="flag ok" title="Enriquecido via web">✓ enriched</span>');
+        else flags.push('<span class="flag warn" title="Pesquisando redes sociais...">🔍 enriquecendo...</span>');
+        
+        return flags.join(' ');
       }
 
       function renderLead(lead) {
@@ -503,29 +335,93 @@
       }
 
       let currentFilter = "todos";
+      let searchTerm = "";
+      let currentPage = 1;
+      let pageSize = 20;
 
       function applyFilter() {
         let list = LEADS.slice().sort((a, b) => b.score - a.score);
+        
+        if (searchTerm) {
+          const lower = searchTerm.toLowerCase();
+          list = list.filter(l => 
+            (l.nome && l.nome.toLowerCase().includes(lower)) ||
+            (l.segmento && l.segmento.toLowerCase().includes(lower)) ||
+            (l.endereco && l.endereco.toLowerCase().includes(lower)) ||
+            (l.whatsapp && l.whatsapp.includes(searchTerm)) ||
+            (l.email && l.email.toLowerCase().includes(lower))
+          );
+        }
+
         if (currentFilter === "comContato") {
           list = list.filter(hasContact);
         } else if (currentFilter !== "todos") {
           list = list.filter((l) => l.tier === currentFilter);
         }
-        document.getElementById("leadGrid").innerHTML = list.map(renderLead).join("");
-        document.getElementById("prosCount").textContent = `${list.length} de ${LEADS.length} exibidos · ordenado por score`;
+        
+        const totalFiltered = list.length;
+        const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
+        
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * pageSize;
+        const paginatedList = list.slice(startIdx, startIdx + pageSize);
+        
+        document.getElementById("leadGrid").innerHTML = paginatedList.map(renderLead).join("");
+        document.getElementById("prosCount").textContent = `${totalFiltered} de ${LEADS.length} leads (Pág ${currentPage}/${totalPages})`;
+        
+        const prevBtn = document.getElementById("prosPrevPage");
+        const nextBtn = document.getElementById("prosNextPage");
+        const pageLabel = document.getElementById("prosPageLabel");
+        
+        if (prevBtn) prevBtn.disabled = currentPage === 1;
+        if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+        if (pageLabel) pageLabel.textContent = `Página ${currentPage} de ${totalPages}`;
       }
 
       function renderStats() {
         document.getElementById("statTotal").textContent = LEADS.length;
         document.getElementById("statQuente").textContent = LEADS.filter((l) => l.tier === "quente").length;
         document.getElementById("statMorno").textContent = LEADS.filter((l) => l.tier === "morno").length;
+        document.getElementById("statFrio").textContent = LEADS.filter((l) => l.tier === "frio").length;
         document.getElementById("statContact").textContent = LEADS.filter(hasContact).length;
       }
 
+      document.getElementById("prosPageSize")?.addEventListener("change", (e) => {
+        pageSize = parseInt(e.target.value, 10);
+        currentPage = 1;
+        applyFilter();
+      });
+
+      document.getElementById("prosSearchInput")?.addEventListener("input", (e) => {
+        searchTerm = e.target.value;
+        currentPage = 1;
+        applyFilter();
+      });
+
+      document.getElementById("prosPrevPage")?.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage--;
+          applyFilter();
+          document.getElementById("leadGrid").scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+
+      document.getElementById("prosNextPage")?.addEventListener("click", () => {
+        currentPage++;
+        applyFilter();
+        document.getElementById("leadGrid").scrollIntoView({ behavior: 'smooth' });
+      });
+
       document.querySelectorAll(".pros-tab").forEach((btn) => {
+        if(btn.id === "refreshProsBtn" || btn.id === "prosPrevPage" || btn.id === "prosNextPage") return;
         btn.addEventListener("click", () => {
           currentFilter = btn.dataset.filter;
-          document.querySelectorAll(".pros-tab").forEach((b) => b.classList.toggle("active", b === btn));
+          currentPage = 1;
+          document.querySelectorAll(".pros-tab").forEach((b) => {
+            if(b.id !== "refreshProsBtn" && b.id !== "prosPrevPage" && b.id !== "prosNextPage") b.classList.toggle("active", b === btn);
+          });
           applyFilter();
         });
       });
@@ -557,9 +453,167 @@
         }
       }
 
-      renderStats();
-      applyFilter();
+      async function enrichLeadOnTheFly(leadId) {
+        try {
+          const res = await fetch(`/api/leads/${leadId}/enrich`, { method: 'POST' });
+          if (!res.ok) return;
+          const { data } = await res.json();
+          
+          const leadIndex = LEADS.findIndex(l => l.id === leadId);
+          if (leadIndex === -1) return;
+          
+          let l = LEADS[leadIndex];
+          l.site = data.website || l.site;
+          l.instagram = data.instagram;
+          l.facebook = data.facebook;
+          l.enriched_at = data.enriched_at;
+          
+          const hasWebsite = !!l.site && String(l.site).trim() !== "" && String(l.site) !== "null";
+          const hasSocial = !!l.instagram || !!l.facebook;
+          
+          if (hasWebsite) {
+            l.situacao = "Possui site próprio";
+            l.oportunidade = "Automação, SEO e sistemas internos";
+            l.abordagem = "Olá! Vi que o site de vocês está muito bacana. Trabalhamos com otimização de conversão e automação de atendimento para ajudar a captar ainda mais clientes da sua base. Faz sentido conversarmos?";
+            l.motivo = "Já possui maturidade digital, focar em retenção e automação.";
+          } else if (hasSocial) {
+            l.situacao = "Só Instagram/Facebook — sem site próprio";
+            l.oportunidade = "Criação de Site / Landing Page";
+            l.abordagem = "Olá! Vi o perfil do negócio de vocês nas redes. Notei que não possuem um site próprio. Uma página focada em captação com agendamento/contato direto ajuda muito a converter clientes. Posso mostrar um modelo pensado para o seu segmento?";
+            l.motivo = "Negócio usa redes sociais mas sem canal de conversão próprio. Lacuna digital = venda de LP/Site.";
+          }
+          
+          // Recalculate score
+          let prosScore = 0;
+          if (l.whatsapp || l.tel) prosScore += 15;
+          if (l.email) prosScore += 5;
+          if (l.endereco && l.endereco !== "Endereço não informado") prosScore += 10;
+          if (l.enriched_at) prosScore += 5;
+          
+          if (!hasWebsite) {
+            prosScore += 60; // 🔥 Dá o pulo para Quente
+          } else if (hasWebsite) {
+            prosScore += 30; // 🟡 Mantém no nível Morno
+          }
+          
+          l.score = prosScore;
+          if (prosScore >= 70) l.tier = "quente";
+          else if (prosScore >= 45) l.tier = "morno";
+          else l.tier = "frio";
+          
+          applyFilter();
+          renderStats();
+        } catch(e) {
+          console.error("Erro ao enriquecer lead", leadId, e);
+        }
+      }
+
+      async function fetchLeads() {
+        try {
+          const btn = document.getElementById("refreshProsBtn");
+          if(btn) btn.textContent = "Pesquisando...";
+          
+          const res = await fetch("/api/leads?limit=1000&_t=" + Date.now());
+          if (!res.ok) throw new Error();
+          const json = await res.json();
+          
+          LEADS = (json.data || []).map(lead => {
+            const hasWebsite = !!lead.website && String(lead.website).trim() !== "" && String(lead.website) !== "null";
+            const hasSocial = !!lead.instagram || !!lead.facebook;
+            
+            let prosScore = 0;
+            if (lead.phone_normalized || lead.phone) prosScore += 15;
+            if (lead.email) prosScore += 5;
+            if (lead.address) prosScore += 10;
+            if (lead.enriched_at) prosScore += 5;
+            
+            if (!hasWebsite) {
+              prosScore += 60; // 🔥 Dá o pulo para Quente
+            } else if (hasWebsite) {
+              prosScore += 30; // 🟡 Mantém no nível Morno
+            }
+            
+            let tier = "frio";
+            if (prosScore >= 70) tier = "quente";
+            else if (prosScore >= 45) tier = "morno";
+            
+            let oportunidade = "";
+            let abordagem = "";
+            let situacao = "Sem site próprio";
+            let motivo = "";
+            
+            if (hasWebsite) {
+              situacao = "Possui site próprio";
+              oportunidade = "Automação, SEO e sistemas internos";
+              abordagem = "Olá! Vi que o site de vocês está muito bacana. Trabalhamos com otimização de conversão e automação de atendimento para ajudar a captar ainda mais clientes da sua base. Faz sentido conversarmos?";
+              motivo = "Já possui maturidade digital, focar em retenção e automação.";
+            } else if (hasSocial) {
+              situacao = "Só Instagram/Facebook — sem site próprio";
+              oportunidade = "Criação de Site / Landing Page";
+              abordagem = "Olá! Vi o perfil do negócio de vocês nas redes. Notei que não possuem um site próprio. Uma página focada em captação com agendamento/contato direto ajuda muito a converter clientes. Posso mostrar um modelo pensado para o seu segmento?";
+              motivo = "Negócio usa redes sociais mas sem canal de conversão próprio. Lacuna digital = venda de LP/Site.";
+            } else {
+              oportunidade = "Criação de Site / Landing Page";
+              abordagem = "Olá! Vi o perfil do negócio de vocês. Notei que não possuem presença digital própria. Ter um site ou página de captação hoje é essencial para novos clientes te acharem no Google. Faz sentido conversarmos?";
+              motivo = "Sem presença web conhecida. Necessita de site/LP para validar.";
+            }
+            
+            const nome = lead.name || "Sem Nome";
+            const demos = DEMO_BY_NAME[nome] || {};
+            return {
+              id: lead.id,
+              nome,
+              segmento: lead.segmento || lead.field_area || "Geral",
+              tier: tier,
+              score: prosScore,
+              abordagem: abordagem,
+              endereco: lead.address || "Endereço não informado",
+              site: hasWebsite ? lead.website : null,
+              instagram: lead.instagram,
+              facebook: lead.facebook,
+              enriched_at: lead.enriched_at,
+              situacao: situacao,
+              oportunidade: oportunidade,
+              motivo: motivo,
+              whatsapp: lead.phone_normalized || lead.phone,
+              tel: null,
+              email: lead.email,
+              demo: demos.demo || null,
+              demo2: demos.demo2 || null,
+              admin: demos.admin || null,
+            };
+          });
+          
+          applyFilter();
+          renderStats();
+          if(btn) btn.textContent = "Atualizar Lista";
+
+          // Start async enrichment for leads without enriched_at flag in batches
+          const leadsToEnrich = LEADS.filter(l => !l.enriched_at);
+          const BATCH_SIZE = 3;
+          
+          async function processBatch() {
+            for (let i = 0; i < leadsToEnrich.length; i += BATCH_SIZE) {
+              const batch = leadsToEnrich.slice(i, i + BATCH_SIZE);
+              await Promise.all(batch.map(l => enrichLeadOnTheFly(l.id)));
+              // Small delay between batches to be safe with DuckDuckGo rate limits
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+          
+          processBatch();
+
+        } catch (e) {
+          console.error("Erro ao carregar leads", e);
+          const btn = document.getElementById("refreshProsBtn");
+          if(btn) btn.textContent = "Erro ao Atualizar";
+        }
+      }
+
+      document.getElementById("refreshProsBtn").addEventListener("click", fetchLeads);
+
       refreshHealth();
+      fetchLeads();
       setInterval(refreshHealth, 30000);
     </script>
   </body>

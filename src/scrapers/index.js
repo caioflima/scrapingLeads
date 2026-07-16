@@ -4,6 +4,7 @@ const { scrapeOverpassSource } = require("./sources/overpassSource");
 const { scrapeGenericApiSource } = require("./sources/genericApiSource");
 const { scrapeCnpj } = require("./sources/cnpjSource");
 const { scrapeGoogleMaps } = require("./sources/googleMapsSource");
+const { scrapeWebKeyword } = require("./sources/webKeywordSource");
 
 function isLikelyJsonApi(source) {
   const url = String(source.base_url || "").toLowerCase();
@@ -32,6 +33,10 @@ async function scrapeSource(source, config, logger, hooks = {}) {
 
   if (source.name.startsWith("gmaps-")) {
     return scrapeGoogleMaps(source, config, logger, hooks);
+  }
+
+  if (source.name.startsWith("websearch-")) {
+    return scrapeWebKeyword(source, config, logger, hooks);
   }
 
   if (isLikelyJsonApi(source)) {

@@ -15,6 +15,7 @@ const {
 describe("leadScoringService", () => {
   it("scores cold lead at zero", () => {
     const signals = {
+      isActive: true,
       emailUnsubscribed: false,
       contacted: false,
       emailsSent: 0,
@@ -33,6 +34,7 @@ describe("leadScoringService", () => {
 
   it("scores whatsapp click as warm or hot", () => {
     const signals = {
+      isActive: true,
       emailUnsubscribed: false,
       contacted: false,
       emailsSent: 1,
@@ -52,6 +54,7 @@ describe("leadScoringService", () => {
 
   it("scores schedule click as hot", () => {
     const signals = {
+      isActive: true,
       emailUnsubscribed: false,
       contacted: false,
       emailsSent: 1,
@@ -71,6 +74,7 @@ describe("leadScoringService", () => {
 
   it("marks unsubscribed as lost", () => {
     const engagement = buildEngagementFromSignals({
+      isActive: true,
       emailUnsubscribed: true,
       contacted: false,
       emailsSent: 1,
@@ -90,6 +94,7 @@ describe("leadScoringService", () => {
 
   it("suggests urgent whatsapp for hot bottom funnel", () => {
     const action = deriveNextAction({
+      isActive: true,
       temperature: "hot",
       funnelStage: "bottom",
       emailUnsubscribed: false,
