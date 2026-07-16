@@ -58,6 +58,16 @@
       .step-badge-draft { background: rgba(240,180,41,.2); color: var(--ink); }
       .step-mini { font-size: 0.75rem; color: var(--muted); margin-top: 0.35rem; }
       .step-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+      /* Select custom tags */
+      .tags-input-container { border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; background: var(--bg-2); position: relative; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; cursor: text; }
+      .tags-input-container input { border: none; background: transparent; outline: none; flex: 1; min-width: 150px; font-size: 0.8rem; color: var(--ink); padding: 0.2rem 0; box-shadow: none; font-family: inherit; }
+      .tags-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+      .tag-item { background: var(--accent); color: #000; padding: 2px 8px; border-radius: 99px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+      .tag-item button { background: none; border: none; color: #000; cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; opacity: 0.6; }
+      .tag-item button:hover { opacity: 1; }
+      .tags-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; max-height: 220px; overflow: auto; z-index: 10; margin-top: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+      .tags-dropdown-item { padding: 0.5rem 0.8rem; font-size: 0.8rem; cursor: pointer; color: var(--ink); }
+      .tags-dropdown-item:hover { background: rgba(255,255,255,0.05); }
     </style>
   </head>
   <body>
@@ -69,9 +79,10 @@
         <p class="eyebrow">Lead Operations</p>
         <h1>Campanhas de Email</h1>
       </div>
-      <nav class="nav-links" aria-label="Navegação do painel">
-        <a href="/panel/">Scraping</a>
-        <a href="/panel/engagement">Engajamento</a>
+        <nav class="nav-links" aria-label="Navegação do painel">
+          <a href="/panel/">Scraping</a>
+          <a href="/panel/leads">Leads</a>
+          <a href="/panel/engagement">Engajamento</a>
         <a href="/panel/whatsapp">WhatsApp</a>
         <a href="/panel/email" class="active">Email</a>
         <a href="/panel/contacts">Contatos</a>
@@ -121,14 +132,15 @@
           <input type="hidden" id="campaignEditId" value="" />
           <label>Nome da campanha<input id="campaignName" type="text" placeholder="Ex: Clínicas SP — primeiro contato" /></label>
           <label>Lote diário<input id="campaignBatch" type="number" min="1" placeholder="Padrão: 50 emails por disparo" value="50" /></label>
-          <div class="segment-box">
-            <div>
-              <span style="font-size:0.85rem;font-weight:500">Fontes (segmento)</span>
-              <div id="campaignSources" class="checkbox-list"></div>
-            </div>
+          <div class="segment-box" style="grid-template-columns: 1fr;">
             <div>
               <span style="font-size:0.85rem;font-weight:500">Áreas / nichos</span>
-              <div id="campaignFieldAreas" class="checkbox-list"></div>
+              <div class="tags-input-container" onclick="document.getElementById('areaSearchInput').focus()">
+                <div id="selectedAreasTags" class="tags-list"></div>
+                <input type="text" id="areaSearchInput" placeholder="Buscar nicho..." autocomplete="off" />
+                <div id="areaDropdown" class="tags-dropdown" style="display:none;"></div>
+              </div>
+              <div id="campaignFieldAreas" style="display:none;"></div>
             </div>
           </div>
           <div>
@@ -440,14 +452,104 @@
       }
 
       function renderCampaignSegmentOptions() {
-        const srcBox = document.getElementById("campaignSources");
-        const areaBox = document.getElementById("campaignFieldAreas");
-        srcBox.innerHTML = state.sources.map((s) =>
-          `<label><input type="checkbox" value="${s.id}" data-campaign-source /> ${s.name}</label>`
-        ).join("") || '<span style="color:var(--muted)">Nenhuma fonte</span>';
-        areaBox.innerHTML = state.fieldAreas.map((a) =>
-          `<label><input type="checkbox" value="${a}" data-campaign-area /> ${a}</label>`
-        ).join("") || '<span style="color:var(--muted)">Nenhuma área</span>';
+        const hiddenBox = document.getElementById("campaignFieldAreas");
+        hiddenBox.innerHTML = state.fieldAreas.map((a) =>
+          `<input type="checkbox" value="${a}" data-campaign-area />`
+        ).join("");
+        
+        setupAreaTags();
+      }
+
+      function setupAreaTags() {
+        const input = document.getElementById("areaSearchInput");
+        const dropdown = document.getElementById("areaDropdown");
+        const tagsBox = document.getElementById("selectedAreasTags");
+        
+        function escapeHtml(str) {
+          return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function renderTags() {
+          const checked = getCheckedValues("[data-campaign-area]");
+          tagsBox.innerHTML = checked.map(val => 
+            `<div class="tag-item">${escapeHtml(val)} <button type="button" data-val="${escapeHtml(val)}">×</button></div>`
+          ).join("");
+        }
+
+        function renderDropdown(filter = "") {
+          const checked = new Set(getCheckedValues("[data-campaign-area]"));
+          const term = filter.toLowerCase();
+          const items = state.fieldAreas.filter(a => a.toLowerCase().includes(term) && !checked.has(a));
+          
+          if (items.length === 0) {
+            dropdown.innerHTML = `<div class="tags-dropdown-item" style="color:var(--muted);cursor:default;">Nenhum nicho encontrado</div>`;
+          } else {
+            dropdown.innerHTML = items.map(a => 
+              `<div class="tags-dropdown-item" data-val="${escapeHtml(a)}">${escapeHtml(a)}</div>`
+            ).join("");
+          }
+        }
+
+        window.toggleArea = function(val) {
+          const checkboxes = document.querySelectorAll("input[data-campaign-area]");
+          let cb = null;
+          for (const box of checkboxes) {
+            if (box.value === val) {
+              cb = box;
+              break;
+            }
+          }
+          if (cb) {
+            cb.checked = !cb.checked;
+            renderTags();
+            renderDropdown(input.value);
+            input.focus();
+          }
+        };
+
+        // Event Delegation handlers to avoid DOM removal issues
+        dropdown.onmousedown = (e) => {
+          const item = e.target.closest(".tags-dropdown-item[data-val]");
+          if (item) {
+            e.preventDefault(); // keep input focused
+            toggleArea(item.getAttribute("data-val"));
+          }
+        };
+
+        tagsBox.onclick = (e) => {
+          const btn = e.target.closest("button[data-val]");
+          if (btn) {
+            toggleArea(btn.getAttribute("data-val"));
+          }
+        };
+
+        // Clean up and setup input listeners
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+        
+        newInput.addEventListener("focus", () => {
+          renderDropdown(newInput.value);
+          dropdown.style.display = "block";
+        });
+        
+        newInput.addEventListener("input", (e) => {
+          renderDropdown(e.target.value);
+          dropdown.style.display = "block";
+        });
+
+        // Global click to close dropdown (avoid duplicate listeners)
+        if (window._closeAreaDropdown) {
+          document.removeEventListener("click", window._closeAreaDropdown);
+        }
+        window._closeAreaDropdown = (e) => {
+          if (e.target.isConnected && !e.target.closest(".tags-input-container")) {
+            const dd = document.getElementById("areaDropdown");
+            if (dd) dd.style.display = "none";
+          }
+        };
+        document.addEventListener("click", window._closeAreaDropdown);
+
+        renderTags();
       }
 
       function getCheckedValues(selector) {
@@ -533,8 +635,17 @@
         document.getElementById("campaignName").value = campaign?.name || "";
         document.getElementById("campaignBatch").value = campaign?.daily_batch_size || "";
         document.getElementById("campaignNotes").value = campaign?.notes || "";
-        setCheckedValues("[data-campaign-source]", campaign?.source_ids || []);
         setCheckedValues("[data-campaign-area]", campaign?.field_areas || []);
+        
+        if (window.toggleArea) {
+          const tagsBox = document.getElementById("selectedAreasTags");
+          if (tagsBox) {
+            tagsBox.innerHTML = getCheckedValues("[data-campaign-area]").map(val => 
+              `<div class="tag-item">${val} <button type="button" onclick="toggleArea('${val}')">×</button></div>`
+            ).join("");
+          }
+        }
+        
         document.getElementById("campaignFormStatus").textContent = "";
 
         const initialSteps = steps?.length
@@ -645,7 +756,7 @@
           subject: steps[0]?.subject || "",
           template: steps[0]?.template || "",
           steps,
-          sourceIds: getCheckedValues("[data-campaign-source]").map(Number),
+          sourceIds: [],
           fieldAreas: getCheckedValues("[data-campaign-area]"),
           dailyBatchSize: document.getElementById("campaignBatch").value.trim() || null,
           notes: document.getElementById("campaignNotes").value.trim() || null

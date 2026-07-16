@@ -30,7 +30,12 @@ async function listSources({ fieldArea = null } = {}) {
   return query;
 }
 
+async function createSources(sources) {
+  return db.batchInsert("lead_sources", sources, 50);
+}
+
 module.exports = {
   getActiveSources,
-  listSources
+  listSources,
+  createSources
 };

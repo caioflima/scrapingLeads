@@ -9,10 +9,6 @@ const state = {
     limit: 20,
     offset: 0
   },
-  leadsPagination: {
-    limit: 20,
-    offset: 0
-  },
   runPanel: {
     isManualMode: false
   }
@@ -23,12 +19,6 @@ const elements = {
   runPanel: document.getElementById("runPanel"),
   fieldAreaSelect: document.getElementById("fieldAreaSelect"),
   sourceSelect: document.getElementById("sourceSelect"),
-  leadsSourceFilter: document.getElementById("leadsSourceFilter"),
-  leadsGenderFilter: document.getElementById("leadsGenderFilter"),
-  leadsPageSize: document.getElementById("leadsPageSize"),
-  prevLeads: document.getElementById("prevLeads"),
-  nextLeads: document.getElementById("nextLeads"),
-  leadsPageLabel: document.getElementById("leadsPageLabel"),
   runButton: document.getElementById("runButton"),
   toggleManualMode: document.getElementById("toggleManualMode"),
   runToken: document.getElementById("runToken"),
@@ -43,9 +33,7 @@ const elements = {
   prevExecutions: document.getElementById("prevExecutions"),
   nextExecutions: document.getElementById("nextExecutions"),
   executionsPageLabel: document.getElementById("executionsPageLabel"),
-  leadsBody: document.getElementById("leadsBody"),
   refreshExecutions: document.getElementById("refreshExecutions"),
-  refreshLeads: document.getElementById("refreshLeads"),
   metricTotalLeads: document.getElementById("metricTotalLeads"),
   metricRealEmail: document.getElementById("metricRealEmail"),
   metricEmailSub: document.getElementById("metricEmailSub"),
@@ -158,7 +146,6 @@ function startExecutionPolling() {
         elements.runButton.disabled = false;
         elements.runStatus.textContent = "Scraping finalizado. Atualize a tabela abaixo.";
         elements.runStatus.style.color = "#2e8b57";
-        await loadLeads();
         return;
       }
 
@@ -198,7 +185,6 @@ async function loadHealth() {
 
 function renderSourceOptions() {
   elements.sourceSelect.textContent = "";
-  elements.leadsSourceFilter.textContent = "";
 
   const API_MANUAL_SOURCE_NAME = "scraping-manual";
 
@@ -207,48 +193,19 @@ function renderSourceOptions() {
   allOptionRun.textContent = "Todas as fontes ativas";
   elements.sourceSelect.appendChild(allOptionRun);
 
-  const allOptionFilter = document.createElement("option");
-  allOptionFilter.value = "";
-  allOptionFilter.textContent = "Todas as fontes";
-  elements.leadsSourceFilter.appendChild(allOptionFilter);
-
   const runSources = (state.selectedFieldArea
     ? state.sources.filter((source) => source.field_area === state.selectedFieldArea)
-    : state.sources).filter((source) => source.name !== API_MANUAL_SOURCE_NAME);
+    : state.sources).filter((source) => source.name !== API_MANUAL_SOURCE_NAME && source.is_active);
 
   for (const source of runSources) {
     const area = source.field_area;
-    const label = `${source.name} [${formatFieldArea(area)}]${source.is_active ? "" : " (inativa)"}`;
+    const label = `${source.name} [${formatFieldArea(area)}]`;
 
     const optionRun = document.createElement("option");
     optionRun.value = String(source.id);
     optionRun.textContent = label;
-    if (!source.is_active) {
-      optionRun.disabled = true;
-    }
 
     elements.sourceSelect.appendChild(optionRun);
-  }
-
-  const orderedFilterSources = [...state.sources].sort((a, b) => {
-    if (a.name === API_MANUAL_SOURCE_NAME && b.name !== API_MANUAL_SOURCE_NAME) {
-      return -1;
-    }
-    if (a.name !== API_MANUAL_SOURCE_NAME && b.name === API_MANUAL_SOURCE_NAME) {
-      return 1;
-    }
-    return a.name.localeCompare(b.name, "pt-BR");
-  });
-
-  for (const source of orderedFilterSources) {
-    const area = source.field_area;
-    const label = `${source.name} [${formatFieldArea(area)}]${source.is_active ? "" : " (inativa)"}`;
-
-    const optionFilter = document.createElement("option");
-    optionFilter.value = String(source.id);
-    optionFilter.textContent = label;
-
-    elements.leadsSourceFilter.appendChild(optionFilter);
   }
 }
 
@@ -345,68 +302,6 @@ async function loadExecutions() {
   elements.nextExecutions.disabled = rows.length < state.executionsPagination.limit;
 }
 
-function formatTemperature(value) {
-  const map = { cold: "Frio", warm: "Morno", hot: "Quente", lost: "Fora" };
-  return map[value] || value || "-";
-}
-
-function formatFunnel(value) {
-  const map = { top: "Topo", middle: "Meio", bottom: "Fundo", lost: "Perdido" };
-  return map[value] || value || "-";
-}
-
-function renderLeads(rows) {
-  elements.leadsBody.textContent = "";
-
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    const values = [
-      row.id,
-      row.name,
-      row.email,
-      row.phone || "-",
-      row.engagement_score ?? 0,
-      formatTemperature(row.temperature),
-      formatFunnel(row.funnel_stage),
-      row.gender || "-",
-      state.sourceMap.get(row.source_id) || `#${row.source_id}`,
-      toLocalDate(row.created_at)
-    ];
-
-    for (const value of values) {
-      const td = document.createElement("td");
-      td.textContent = String(value ?? "-");
-      tr.appendChild(td);
-    }
-
-    elements.leadsBody.appendChild(tr);
-  }
-}
-
-async function loadLeads() {
-  const sourceId = elements.leadsSourceFilter.value;
-  const gender = elements.leadsGenderFilter.value;
-  const qs = new URLSearchParams({
-    limit: String(state.leadsPagination.limit),
-    offset: String(state.leadsPagination.offset)
-  });
-  if (sourceId) {
-    qs.set("source_id", sourceId);
-  }
-  if (gender) {
-    qs.set("gender", gender);
-  }
-
-  const payload = await requestJson(`/api/leads?${qs.toString()}`);
-  const rows = payload.data || [];
-  renderLeads(rows);
-
-  const page = Math.floor(state.leadsPagination.offset / state.leadsPagination.limit) + 1;
-  elements.leadsPageLabel.textContent = `Pagina ${page}`;
-  elements.prevLeads.disabled = state.leadsPagination.offset === 0;
-  elements.nextLeads.disabled = rows.length < state.leadsPagination.limit;
-}
-
 async function loadSummary() {
   const payload = await requestJson("/api/dashboard/summary");
   const data = payload.data || {};
@@ -439,6 +334,7 @@ async function runScraping() {
 
   try {
     const sourceId = elements.sourceSelect.value;
+    const fieldArea = elements.fieldAreaSelect.value;
     const token = elements.runToken.value.trim();
 
     await requestJson("/api/scrape/run", {
@@ -447,12 +343,20 @@ async function runScraping() {
         "Content-Type": "application/json",
         ...(token ? { "x-panel-token": token } : {})
       },
-      body: JSON.stringify({ sourceId: sourceId || null })
+      body: JSON.stringify({ 
+        sourceId: sourceId || null,
+        fieldArea: fieldArea || null
+      })
     });
 
-    elements.runStatus.textContent = sourceId
-      ? "Scraping iniciado em background para a fonte selecionada."
-      : "Scraping iniciado em background para todas as fontes ativas. Pode levar bastante tempo.";
+    let statusText = "Scraping iniciado em background para todas as fontes ativas. Pode levar bastante tempo.";
+    if (sourceId) {
+      statusText = "Scraping iniciado em background para a fonte selecionada.";
+    } else if (fieldArea) {
+      statusText = `Scraping iniciado em background para o segmento: ${fieldArea}.`;
+    }
+
+    elements.runStatus.textContent = statusText;
     elements.runStatus.style.color = "#0f7a6a";
 
     await loadExecutions();
@@ -536,11 +440,7 @@ async function runManualScraping() {
     elements.manualStatus.textContent = `Finalizado (extraidos=${totalExtracted}, ${persistSummary})${warningSummary}`;
     elements.manualStatus.style.color = "#2e8b57";
 
-    if (state.manualSourceId) {
-      elements.leadsSourceFilter.value = String(state.manualSourceId);
-    }
-    state.leadsPagination.offset = 0;
-    await Promise.all([loadSummary(), loadLeads()]);
+    await loadSummary();
   } catch (error) {
     elements.manualStatus.textContent = `Falha: ${error.message}`;
     elements.manualStatus.style.color = "#a93c3c";
@@ -551,10 +451,9 @@ async function runManualScraping() {
 
 async function initialLoad() {
   try {
-    elements.leadsPageSize.value = String(state.leadsPagination.limit);
     await loadHealth();
     await loadSources();
-    await Promise.all([loadSummary(), loadExecutions(), loadLeads()]);
+    await Promise.all([loadSummary(), loadExecutions()]);
 
     if (hasRunningExecutions()) {
       updateRunStatusFromExecutions();
@@ -578,10 +477,6 @@ elements.refreshExecutions.addEventListener("click", () => {
   state.executionsPagination.offset = 0;
   loadExecutions();
 });
-elements.refreshLeads.addEventListener("click", () => {
-  state.leadsPagination.offset = 0;
-  loadLeads();
-});
 elements.prevExecutions.addEventListener("click", () => {
   state.executionsPagination.offset = Math.max(0, state.executionsPagination.offset - state.executionsPagination.limit);
   loadExecutions();
@@ -590,31 +485,9 @@ elements.nextExecutions.addEventListener("click", () => {
   state.executionsPagination.offset += state.executionsPagination.limit;
   loadExecutions();
 });
-elements.prevLeads.addEventListener("click", () => {
-  state.leadsPagination.offset = Math.max(0, state.leadsPagination.offset - state.leadsPagination.limit);
-  loadLeads();
-});
-elements.nextLeads.addEventListener("click", () => {
-  state.leadsPagination.offset += state.leadsPagination.limit;
-  loadLeads();
-});
 elements.fieldAreaSelect.addEventListener("change", () => {
   state.selectedFieldArea = elements.fieldAreaSelect.value;
   renderSourceOptions();
-});
-elements.leadsSourceFilter.addEventListener("change", () => {
-  state.leadsPagination.offset = 0;
-  loadLeads();
-});
-elements.leadsGenderFilter.addEventListener("change", () => {
-  state.leadsPagination.offset = 0;
-  loadLeads();
-});
-elements.leadsPageSize.addEventListener("change", () => {
-  const selectedLimit = Number(elements.leadsPageSize.value);
-  state.leadsPagination.limit = Number.isInteger(selectedLimit) && selectedLimit > 0 ? selectedLimit : 20;
-  state.leadsPagination.offset = 0;
-  loadLeads();
 });
 
 setRunPanelMode(false);

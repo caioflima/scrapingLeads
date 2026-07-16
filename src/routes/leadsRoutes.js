@@ -1,10 +1,14 @@
 const express = require("express");
+const { enrichLead } = require("../services/leadEnrichmentService");
+
 const env = require("../config/env");
 const {
   listLeads,
   listEngagementLeads,
   listUncontactedLeadsWithPhone,
-  markLeadAsContacted
+  countUncontactedLeadsWithPhone,
+  markLeadAsContacted,
+  countLeadsByFieldArea
 } = require("../repositories/leadRepository");
 const { getEngagementSummary, recalculateAllLeads, fetchLeadSignals, buildEngagementFromSignals, classifyClickUrl } = require("../services/leadScoringService");
 const { listLeadEmailEvents, VALID_EVENT_TYPES } = require("../repositories/emailRepository");
@@ -36,9 +40,19 @@ router.get("/", async (req, res, next) => {
     const gender = rawGender && ["F", "M"].includes(rawGender) ? rawGender : null;
     const temperature = req.query.temperature ? String(req.query.temperature) : null;
     const funnelStage = req.query.funnel_stage ? String(req.query.funnel_stage) : null;
+    const fieldArea = req.query.field_area ? String(req.query.field_area) : null;
 
-    const leads = await listLeads({ limit, offset, sourceId, gender, temperature, funnelStage });
-    res.json({ data: leads, pagination: { limit, offset, gender } });
+    const leads = await listLeads({ limit, offset, sourceId, gender, temperature, funnelStage, fieldArea });
+    res.json({ data: leads, pagination: { limit, offset, gender, field_area: fieldArea } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/segments", async (req, res, next) => {
+  try {
+    const segments = await countLeadsByFieldArea();
+    res.json({ data: segments });
   } catch (error) {
     next(error);
   }
@@ -46,8 +60,11 @@ router.get("/", async (req, res, next) => {
 
 router.get("/uncontacted", async (req, res, next) => {
   try {
-    const leads = await listUncontactedLeadsWithPhone(100);
-    res.json({ data: leads });
+    const limit = parseLimit(req.query.limit, 100);
+    const offset = parseOffset(req.query.offset, 0);
+    const leads = await listUncontactedLeadsWithPhone({ limit, offset });
+    const total = await countUncontactedLeadsWithPhone();
+    res.json({ data: leads, pagination: { limit, offset, total } });
   } catch (error) {
     next(error);
   }
@@ -160,6 +177,20 @@ router.post("/:id/contact", async (req, res, next) => {
     }
     await markLeadAsContacted(id);
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+router.post("/:id/enrich", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id || !Number.isInteger(id)) {
+      return res.status(400).json({ message: "Invalid lead ID" });
+    }
+    const result = await enrichLead(id);
+    res.json({ data: result });
   } catch (error) {
     next(error);
   }
